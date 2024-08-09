@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>CodePen - A Pen by Static animation</title>
+  
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WiseWave AI Chat</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.3/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .chat-container {
+        background-color: #2d2d2d;
+        max-height: 80vh;
+        overflow-y: auto;
+        padding: 10px;
+        border-radius: 10px;
+        position: relative;
+      }
+      .message {
+        max-width: 60%;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 5px 0;
+        line-height: 1.5;
+        opacity: 0;
+        animation: fadeIn 0.5s forwards;
+      }
+      .message-left {
+        background-color: #4a4a4a;
+        color: #e0e0e0;
+        align-self: flex-start;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+      }
+      .message-right {
+        background-color: #007bff;
+        color: #ffffff;
+        align-self: flex-end;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+      }
+      .input-container {
+        background-color: #1a1a1a;
+        border-radius: 10px;
+      }
+      .input-field {
+        background-color: #333;
+        color: #fff;
+        border: 1px solid #444;
+      }
+      .send-button {
+        background-color: #28a745;
+        border: none;
+      }
+      .send-button:hover {
+        background-color: #218838;
+      }
+      .restart-button {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: #ffffff; /* Icon color */
+      }
+      .restart-button:hover {
+        color: #f0f0f0; /* Icon color on hover */
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes typing {
+        0% {
+          width: 0;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+      .typing-indicator {
+        display: inline-block;
+        background: #666;
+        color: #fff;
+        padding: 5px;
+        border-radius: 10px;
+        opacity: 0;
+        animation: typing 1.5s steps(10) infinite;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-gray-800 shadow-lg rounded-lg px-4 py-6">
+      <div class="relative">
+        <button class="restart-button" id="restartButton">
+          <i class="fas fa-redo"></i>
+        </button>
+        <h1 class="text-3xl font-bold text-white text-center mb-4">Welcome to WiseWave AI!</h1>
+        <div id="chatbox" class="chat-container flex flex-col"></div>
+        <div id="typingIndicator" class="typing-indicator hidden">Typing...</div>
+        <div class="input-container flex flex-row my-5 p-2">
+          <input
+            class="input-field shadow flex-grow rounded p-2 mr-2"
+            id="messageInput"
+            type="text"
+            placeholder="Type your message..."
+          />
+          <button
+            class="send-button rounded py-2 px-4 text-white font-bold"
+            id="sendButton"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const chatbox = document.getElementById("chatbox");
+      const messageInput = document.getElementById("messageInput");
+      const sendButton = document.getElementById("sendButton");
+      const restartButton = document.getElementById("restartButton");
+      const typingIndicator = document.getElementById("typingIndicator");
+      const chatId = crypto.randomUUID();
+      let receiving = false;
+      const systemPrompt = "You are a knowledgeable and helpful AI mentor, guiding users through a wide range of tasks and providing support and assistance whenever needed.";
+
+      function createMessageElement(text, alignment) {
+        const messageElement = document.createElement("div");
+        messageElement.className = `message ${alignment === "left" ? "message-left" : "message-right"}`;
+        messageElement.textContent = text;
+        return messageElement;
+      }
+
+      function connectWebSocket(message) {
+        receiving = true;
+        const url = "wss://backend.buildpicoapps.com/api/chatbot/chat";
+        const websocket = new WebSocket(url);
+
+        websocket.addEventListener("open", () => {
+          websocket.send(
+            JSON.stringify({
+              chatId: chatId,
+              appId: "structure-address",
+              systemPrompt: systemPrompt,
+              message: message,
+            })
+          );
+          typingIndicator.classList.remove('hidden'); // Show typing indicator
+        });
+
+        const messageElement = createMessageElement("", "left");
+        chatbox.appendChild(messageElement);
+
+        websocket.onmessage = (event) => {
+          typingIndicator.classList.add('hidden'); // Hide typing indicator
+          messageElement.innerText += event.data;
+          chatbox.scrollTop = chatbox.scrollHeight;
+        };
+
+        websocket.onerror = (error) => {
+          typingIndicator.classList.add('hidden'); // Hide typing indicator
+          messageElement.textContent += "Error connecting to server. Please try again.";
+          chatbox.scrollTop = chatbox.scrollHeight;
+          receiving = false;
+        };
+
+        websocket.onclose = (event) => {
+          if (event.code === 1000) {
+            receiving = false;
+          } else {
+            messageElement.textContent += "Connection closed unexpectedly. Please try again.";
+            chatbox.scrollTop = chatbox.scrollHeight;
+            receiving = false;
+          }
+        };
+      }
+
+      sendButton.addEventListener("click", () => {
+        if (!receiving && messageInput.value.trim() !== "") {
+          const messageText = messageInput.value.trim();
+          messageInput.value = "";
+          const messageElement = createMessageElement(messageText, "right");
+          chatbox.appendChild(messageElement);
+          chatbox.scrollTop = chatbox.scrollHeight;
+
+          connectWebSocket(messageText);
+        }
+      });
+
+      messageInput.addEventListener("keydown", (event) => {
+        if (
+          event.key === "Enter" &&
+          !receiving &&
+          messageInput.value.trim() !== ""
+        ) {
+          event.preventDefault();
+          sendButton.click();
+        }
+      });
+
+      restartButton.addEventListener("click", () => {
+        chatbox.innerHTML = ""; // Clear chat messages
+      });
+    </script>
+  </body>
+</html>
+<!-- partial -->
+  
+</body>
+</html>
